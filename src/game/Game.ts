@@ -1,7 +1,9 @@
 // Crates - Main Game Class
 
 import { LEVELS, LevelData } from './levels';
-import { CELL_SIZE, COLORS, DIRECTIONS, STORAGE_KEY } from './constants';
+import { CELL_SIZE, STORAGE_KEY, DIRECTIONS } from './constants';
+import { Renderer } from './Renderer';
+import { Input } from './Input';
 import type {
   Position,
   Cell,
@@ -15,7 +17,8 @@ import type {
 
 export class Game {
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private renderer: Renderer;
+  private input: Input;
 
   private levelIndex: number = 0;
   private level!: Level;
@@ -25,19 +28,32 @@ export class Game {
   private pushes: number = 0;
   private undoStack: MoveRecord[] = [];
   private status: GameStatus = 'playing';
+  private completedLevels: number[] = [];
+  private bestSolutions: { [key: number]: { moves: number; pushes: number } } = {};
 
   onStateChange?: (state: GameState) => void;
+  onMenuRequest?: () => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Could not get 2D context');
-    this.ctx = ctx;
+    this.renderer = new Renderer(canvas);
+
+    this.input = new Input({
+      onMove: (dir) => this.move(dir),
+      onUndo: () => this.undo(),
+      onRestart: () => this.restart(),
+      onNextLevel: () => this.nextLevel(),
+      onPrevLevel: () => this.prevLevel(),
+      onMenu: () => this.onMenuRequest?.(),
+      onConfirm: () => {
+        if (this.status === 'won') {
+          this.nextLevel();
+        }
+      },
+    });
 
     this.loadProgress();
     this.loadLevel(this.levelIndex);
-    this.setupInput();
-    this.render();
   }
 
   private loadLevel(index: number): void {
@@ -52,9 +68,10 @@ export class Game {
     this.undoStack = [];
     this.status = 'playing';
 
-    // Resize canvas to fit level
-    this.canvas.width = this.level.width * CELL_SIZE;
-    this.canvas.height = this.level.height * CELL_SIZE;
+    this.renderer.resize(this.level.width, this.level.height);
+    this.input.setCanvas(this.canvas, CELL_SIZE);
+    this.input.setPlayerPosition(this.player.x, this.player.y);
+    this.input.setEnabled(true);
 
     this.render();
     this.emitState();
@@ -120,125 +137,104 @@ export class Game {
     };
   }
 
-  private setupInput(): void {
-    window.addEventListener('keydown', this.handleKeyDown.bind(this));
-  }
-
-  private handleKeyDown(e: KeyboardEvent): void {
-    if (this.status !== 'playing') {
-      if (e.key === ' ' || e.key === 'Enter') {
-        if (this.status === 'won') {
-          this.nextLevel();
-        }
-      }
-      return;
-    }
-
-    let direction: Direction | null = null;
-
-    switch (e.key) {
-      case 'ArrowUp':
-      case 'w':
-      case 'W':
-        direction = 'up';
-        break;
-      case 'ArrowDown':
-      case 's':
-      case 'S':
-        direction = 'down';
-        break;
-      case 'ArrowLeft':
-      case 'a':
-      case 'A':
-        direction = 'left';
-        break;
-      case 'ArrowRight':
-      case 'd':
-      case 'D':
-        direction = 'right';
-        break;
-      case 'u':
-      case 'U':
-      case 'z':
-      case 'Z':
-        if (e.ctrlKey || e.key === 'u' || e.key === 'U') {
-          this.undo();
-        }
-        break;
-      case 'r':
-      case 'R':
-        this.restart();
-        break;
-      case 'n':
-      case 'N':
-        this.nextLevel();
-        break;
-      case 'p':
-      case 'P':
-        this.prevLevel();
-        break;
-    }
-
-    if (direction) {
-      e.preventDefault();
-      this.move(direction);
-    }
-  }
-
   private move(direction: Direction): void {
+    if (this.status !== 'playing' || this.renderer.isAnimating()) return;
+
     const { dx, dy } = DIRECTIONS[direction];
     const targetX = this.player.x + dx;
     const targetY = this.player.y + dy;
 
-    // Check if target is wall
     if (this.isWall(targetX, targetY)) return;
 
-    // Check if target has crate
     const crateIndex = this.getCrateAt(targetX, targetY);
+    const playerFrom = { ...this.player };
 
     if (crateIndex !== -1) {
-      // Try to push crate
       const beyondX = targetX + dx;
       const beyondY = targetY + dy;
 
       if (this.isWall(beyondX, beyondY) || this.getCrateAt(beyondX, beyondY) !== -1) {
-        return; // Can't push
+        return;
       }
 
-      // Push the crate
+      const crateFrom = { x: targetX, y: targetY };
+      const crateTo = { x: beyondX, y: beyondY };
+
       const record: MoveRecord = {
-        playerFrom: { ...this.player },
+        playerFrom,
         playerTo: { x: targetX, y: targetY },
-        crateMoved: { x: targetX, y: targetY },
-        crateTo: { x: beyondX, y: beyondY },
+        crateMoved: crateFrom,
+        crateTo,
       };
 
-      this.crates[crateIndex] = { x: beyondX, y: beyondY };
-      this.player = { x: targetX, y: targetY };
-      this.moves++;
-      this.pushes++;
-      this.undoStack.push(record);
+      // Start animation
+      this.input.setEnabled(false);
+      this.renderer.startMoveAnimation(
+        playerFrom,
+        record.playerTo,
+        crateFrom,
+        crateTo,
+        crateIndex,
+        () => {
+          // Complete the move after animation
+          this.crates[crateIndex] = { ...crateTo };
+          this.player = { ...record.playerTo };
+          this.moves++;
+          this.pushes++;
+          this.undoStack.push(record);
+          this.input.setPlayerPosition(this.player.x, this.player.y);
+          this.input.setEnabled(true);
+          this.render();
+          this.checkWin();
+          this.emitState();
+        }
+      );
+
+      // Render animation frames
+      this.animateMove();
     } else {
-      // Just move player
       const record: MoveRecord = {
-        playerFrom: { ...this.player },
+        playerFrom,
         playerTo: { x: targetX, y: targetY },
         crateMoved: null,
         crateTo: null,
       };
 
-      this.player = { x: targetX, y: targetY };
-      this.moves++;
-      this.undoStack.push(record);
-    }
+      this.input.setEnabled(false);
+      this.renderer.startMoveAnimation(
+        playerFrom,
+        record.playerTo,
+        null,
+        null,
+        -1,
+        () => {
+          this.player = { ...record.playerTo };
+          this.moves++;
+          this.undoStack.push(record);
+          this.input.setPlayerPosition(this.player.x, this.player.y);
+          this.input.setEnabled(true);
+          this.render();
+          this.checkWin();
+          this.emitState();
+        }
+      );
 
-    this.render();
-    this.checkWin();
-    this.emitState();
+      this.animateMove();
+    }
   }
 
-  private undo(): void {
-    if (this.undoStack.length === 0) return;
+  private animateMove(): void {
+    const animate = () => {
+      if (this.renderer.isAnimating()) {
+        this.render();
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  undo(): void {
+    if (this.undoStack.length === 0 || this.renderer.isAnimating()) return;
 
     const record = this.undoStack.pop()!;
     this.player = { ...record.playerFrom };
@@ -252,6 +248,7 @@ export class Game {
       }
     }
 
+    this.input.setPlayerPosition(this.player.x, this.player.y);
     this.render();
     this.emitState();
   }
@@ -290,10 +287,6 @@ export class Game {
     return this.crates.findIndex(c => c.x === x && c.y === y);
   }
 
-  private isTarget(x: number, y: number): boolean {
-    return this.level.grid[y]?.[x] === 'target';
-  }
-
   private checkWin(): void {
     const allOnTarget = this.level.targets.every(target =>
       this.crates.some(crate => crate.x === target.x && crate.y === target.y)
@@ -306,71 +299,7 @@ export class Game {
   }
 
   private render(): void {
-    const ctx = this.ctx;
-
-    // Clear
-    ctx.fillStyle = COLORS.background;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    // Draw grid
-    for (let y = 0; y < this.level.height; y++) {
-      for (let x = 0; x < this.level.width; x++) {
-        const cell = this.level.grid[y][x];
-        const px = x * CELL_SIZE;
-        const py = y * CELL_SIZE;
-
-        if (cell === 'wall') {
-          ctx.fillStyle = COLORS.wall;
-          ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
-        } else {
-          ctx.fillStyle = COLORS.floor;
-          ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
-
-          if (cell === 'target') {
-            // Draw target marker
-            ctx.fillStyle = COLORS.target;
-            ctx.beginPath();
-            ctx.arc(px + CELL_SIZE / 2, py + CELL_SIZE / 2, CELL_SIZE / 4, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-      }
-    }
-
-    // Draw crates
-    for (const crate of this.crates) {
-      const onTarget = this.isTarget(crate.x, crate.y);
-      ctx.fillStyle = onTarget ? COLORS.crateOnTarget : COLORS.crate;
-      ctx.fillRect(
-        crate.x * CELL_SIZE + 4,
-        crate.y * CELL_SIZE + 4,
-        CELL_SIZE - 8,
-        CELL_SIZE - 8
-      );
-
-      // Crate border
-      ctx.strokeStyle = onTarget ? '#3d7a3d' : '#6b5010';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(
-        crate.x * CELL_SIZE + 4,
-        crate.y * CELL_SIZE + 4,
-        CELL_SIZE - 8,
-        CELL_SIZE - 8
-      );
-    }
-
-    // Draw player
-    const onTarget = this.isTarget(this.player.x, this.player.y);
-    ctx.fillStyle = onTarget ? COLORS.playerOnTarget : COLORS.player;
-    ctx.beginPath();
-    ctx.arc(
-      this.player.x * CELL_SIZE + CELL_SIZE / 2,
-      this.player.y * CELL_SIZE + CELL_SIZE / 2,
-      CELL_SIZE / 3,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
+    this.renderer.render(this.level, this.player, this.crates, this.status);
   }
 
   getState(): GameState {
@@ -386,6 +315,10 @@ export class Game {
     };
   }
 
+  getCompletedLevels(): number[] {
+    return [...this.completedLevels];
+  }
+
   private emitState(): void {
     if (this.onStateChange) {
       this.onStateChange(this.getState());
@@ -398,6 +331,8 @@ export class Game {
       if (saved) {
         const progress: Progress = JSON.parse(saved);
         this.levelIndex = progress.currentLevel || 0;
+        this.completedLevels = progress.completedLevels || [];
+        this.bestSolutions = progress.bestSolutions || {};
       }
     } catch {
       // Ignore errors
@@ -406,18 +341,16 @@ export class Game {
 
   private saveProgress(): void {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const progress: Progress = saved ? JSON.parse(saved) : {
-        currentLevel: 0,
-        completedLevels: [],
-        bestSolutions: {},
+      const progress: Progress = {
+        currentLevel: this.levelIndex,
+        completedLevels: this.completedLevels,
+        bestSolutions: this.bestSolutions,
       };
-
-      progress.currentLevel = this.levelIndex;
 
       if (this.status === 'won') {
         if (!progress.completedLevels.includes(this.levelIndex)) {
           progress.completedLevels.push(this.levelIndex);
+          this.completedLevels = progress.completedLevels;
         }
 
         const best = progress.bestSolutions[this.levelIndex];
@@ -426,6 +359,7 @@ export class Game {
             moves: this.moves,
             pushes: this.pushes,
           };
+          this.bestSolutions = progress.bestSolutions;
         }
       }
 
@@ -440,6 +374,6 @@ export class Game {
   }
 
   destroy(): void {
-    window.removeEventListener('keydown', this.handleKeyDown.bind(this));
+    this.input.destroy();
   }
 }

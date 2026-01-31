@@ -3,11 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Game } from '@/game/Game';
 import type { GameState } from '@/game/types';
+import { HUD } from './HUD';
+import { Controls } from './Controls';
+import { LevelSelect } from './LevelSelect';
 
 export function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const [completedLevels, setCompletedLevels] = useState<number[]>([]);
 
   const handleStateChange = useCallback((state: GameState) => {
     setGameState(state);
@@ -19,33 +24,60 @@ export function GameCanvas() {
 
     const game = new Game(canvas);
     game.onStateChange = handleStateChange;
+    game.onMenuRequest = () => setShowLevelSelect(true);
     gameRef.current = game;
     setGameState(game.getState());
+    setCompletedLevels(game.getCompletedLevels());
 
     return () => {
       game.destroy();
     };
   }, [handleStateChange]);
 
-  const handleUndo = () => gameRef.current?.restart();
+  // Update completed levels when state changes
+  useEffect(() => {
+    if (gameState?.status === 'won' && gameRef.current) {
+      setCompletedLevels(gameRef.current.getCompletedLevels());
+    }
+  }, [gameState?.status]);
+
+  // Handle Escape key for level select
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showLevelSelect) {
+        setShowLevelSelect(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showLevelSelect]);
+
+  const handleUndo = () => gameRef.current?.undo();
   const handleRestart = () => gameRef.current?.restart();
   const handlePrev = () => gameRef.current?.prevLevel();
   const handleNext = () => gameRef.current?.nextLevel();
+  const handleLevelSelect = (index: number) => {
+    gameRef.current?.goToLevel(index);
+    setShowLevelSelect(false);
+  };
+
+  const totalLevels = gameRef.current?.getLevelCount() ?? 20;
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* Header */}
-      <div className="w-full max-w-xl flex justify-between items-center px-2">
-        <h1 className="text-2xl font-bold text-white">CRATES</h1>
-        {gameState && (
-          <div className="text-sm text-gray-300">
-            Level {gameState.levelIndex + 1}: {gameState.level.name}
-          </div>
-        )}
-      </div>
+      {/* HUD */}
+      {gameState && (
+        <HUD
+          levelIndex={gameState.levelIndex}
+          levelName={gameState.level.name}
+          moves={gameState.moves}
+          pushes={gameState.pushes}
+          totalLevels={totalLevels}
+        />
+      )}
 
       {/* Canvas Container */}
-      <div className="relative">
+      <div className="relative flex items-center justify-center">
         <canvas
           ref={canvasRef}
           className="border-4 border-gray-700 rounded"
@@ -63,43 +95,35 @@ export function GameCanvas() {
         )}
       </div>
 
-      {/* Stats */}
-      {gameState && (
-        <div className="flex gap-6 text-white">
-          <div>Moves: <span className="font-mono">{gameState.moves}</span></div>
-          <div>Pushes: <span className="font-mono">{gameState.pushes}</span></div>
-        </div>
-      )}
-
       {/* Controls */}
-      <div className="flex gap-2">
-        <button
-          onClick={handlePrev}
-          disabled={!gameState || gameState.levelIndex === 0}
-          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          ← Prev
-        </button>
-        <button
-          onClick={handleRestart}
-          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-        >
-          ↺ Restart
-        </button>
-        <button
-          onClick={handleNext}
-          disabled={!gameState || gameState.levelIndex >= 19}
-          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next →
-        </button>
-      </div>
+      {gameState && (
+        <Controls
+          onUndo={handleUndo}
+          onRestart={handleRestart}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onLevelSelect={() => setShowLevelSelect(true)}
+          canUndo={gameState.undoStack.length > 0}
+          canPrev={gameState.levelIndex > 0}
+          canNext={gameState.levelIndex < totalLevels - 1}
+        />
+      )}
 
       {/* Instructions */}
       <div className="text-sm text-gray-400 text-center max-w-md">
-        <p>Arrow keys or WASD to move</p>
-        <p>U to undo • R to restart • N/P for next/prev level</p>
+        <p>Arrow keys or WASD to move | Click adjacent cell</p>
+        <p>U / Ctrl+Z to undo | R to restart | Escape for levels</p>
       </div>
+
+      {/* Level Select Modal */}
+      {showLevelSelect && gameState && (
+        <LevelSelect
+          currentLevel={gameState.levelIndex}
+          completedLevels={completedLevels}
+          onSelect={handleLevelSelect}
+          onClose={() => setShowLevelSelect(false)}
+        />
+      )}
     </div>
   );
 }
