@@ -1,7 +1,7 @@
 // Crates - Canvas Renderer
 
-import { CELL_SIZE, COLORS, MOVE_DURATION_MS } from './constants';
-import type { Position, Cell, Level, GameStatus } from './types';
+import { CELL_SIZE, COLORS, MOVE_DURATION_MS, MAX_WIDTH, MAX_HEIGHT } from './constants';
+import type { Position, Level, GameStatus } from './types';
 
 interface AnimationState {
   active: boolean;
@@ -26,6 +26,9 @@ export class Renderer {
     crateIndex: -1,
   };
   private animationCallback: (() => void) | null = null;
+  private offsetX: number = 0;
+  private offsetY: number = 0;
+  private scale: number = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -34,9 +37,40 @@ export class Renderer {
     this.ctx = ctx;
   }
 
-  resize(width: number, height: number): void {
-    this.canvas.width = width * CELL_SIZE;
-    this.canvas.height = height * CELL_SIZE;
+  resize(levelWidth: number, levelHeight: number, containerWidth?: number, containerHeight?: number): void {
+    // Calculate max canvas size based on container or defaults
+    const maxCanvasWidth = containerWidth ?? MAX_WIDTH * CELL_SIZE;
+    const maxCanvasHeight = containerHeight ?? MAX_HEIGHT * CELL_SIZE;
+
+    // Calculate required size for level
+    const requiredWidth = levelWidth * CELL_SIZE;
+    const requiredHeight = levelHeight * CELL_SIZE;
+
+    // Calculate scale to fit within max bounds while maintaining aspect ratio
+    const scaleX = maxCanvasWidth / requiredWidth;
+    const scaleY = maxCanvasHeight / requiredHeight;
+    this.scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down
+
+    // Set canvas to fixed viewport size for centering
+    const viewportWidth = Math.min(requiredWidth, maxCanvasWidth);
+    const viewportHeight = Math.min(requiredHeight, maxCanvasHeight);
+    
+    this.canvas.width = viewportWidth;
+    this.canvas.height = viewportHeight;
+
+    // Calculate offset to center the level
+    const scaledWidth = requiredWidth * this.scale;
+    const scaledHeight = requiredHeight * this.scale;
+    this.offsetX = (viewportWidth - scaledWidth) / 2;
+    this.offsetY = (viewportHeight - scaledHeight) / 2;
+  }
+
+  getScale(): number {
+    return this.scale;
+  }
+
+  getOffset(): { x: number; y: number } {
+    return { x: this.offsetX, y: this.offsetY };
   }
 
   startMoveAnimation(
@@ -104,6 +138,7 @@ export class Renderer {
   ): void {
     const ctx = this.ctx;
     const progress = this.easeOut(this.getAnimationProgress());
+    const cellSize = CELL_SIZE * this.scale;
 
     // Calculate display positions
     let displayPlayer = player;
@@ -127,24 +162,24 @@ export class Renderer {
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Draw grid
+    // Draw grid (with offset for centering)
     for (let y = 0; y < level.height; y++) {
       for (let x = 0; x < level.width; x++) {
         const cell = level.grid[y][x];
-        const px = x * CELL_SIZE;
-        const py = y * CELL_SIZE;
+        const px = this.offsetX + x * cellSize;
+        const py = this.offsetY + y * cellSize;
 
         if (cell === 'wall') {
           ctx.fillStyle = COLORS.wall;
-          ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+          ctx.fillRect(px, py, cellSize, cellSize);
         } else {
           ctx.fillStyle = COLORS.floor;
-          ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+          ctx.fillRect(px, py, cellSize, cellSize);
 
           if (cell === 'target') {
             ctx.fillStyle = COLORS.target;
             ctx.beginPath();
-            ctx.arc(px + CELL_SIZE / 2, py + CELL_SIZE / 2, CELL_SIZE / 4, 0, Math.PI * 2);
+            ctx.arc(px + cellSize / 2, py + cellSize / 2, cellSize / 4, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -152,6 +187,7 @@ export class Renderer {
     }
 
     // Draw crates
+    const padding = 4 * this.scale;
     for (let i = 0; i < displayCrates.length; i++) {
       const crate = displayCrates[i];
       const actualCrate = crates[i];
@@ -159,19 +195,19 @@ export class Renderer {
       
       ctx.fillStyle = onTarget ? COLORS.crateOnTarget : COLORS.crate;
       ctx.fillRect(
-        crate.x * CELL_SIZE + 4,
-        crate.y * CELL_SIZE + 4,
-        CELL_SIZE - 8,
-        CELL_SIZE - 8
+        this.offsetX + crate.x * cellSize + padding,
+        this.offsetY + crate.y * cellSize + padding,
+        cellSize - padding * 2,
+        cellSize - padding * 2
       );
 
       ctx.strokeStyle = onTarget ? '#3d7a3d' : '#6b5010';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * this.scale;
       ctx.strokeRect(
-        crate.x * CELL_SIZE + 4,
-        crate.y * CELL_SIZE + 4,
-        CELL_SIZE - 8,
-        CELL_SIZE - 8
+        this.offsetX + crate.x * cellSize + padding,
+        this.offsetY + crate.y * cellSize + padding,
+        cellSize - padding * 2,
+        cellSize - padding * 2
       );
     }
 
@@ -181,9 +217,9 @@ export class Renderer {
     ctx.fillStyle = onTarget ? COLORS.playerOnTarget : COLORS.player;
     ctx.beginPath();
     ctx.arc(
-      displayPlayer.x * CELL_SIZE + CELL_SIZE / 2,
-      displayPlayer.y * CELL_SIZE + CELL_SIZE / 2,
-      CELL_SIZE / 3,
+      this.offsetX + displayPlayer.x * cellSize + cellSize / 2,
+      this.offsetY + displayPlayer.y * cellSize + cellSize / 2,
+      cellSize / 3,
       0,
       Math.PI * 2
     );

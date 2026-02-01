@@ -51,7 +51,7 @@ export const LEVELS: LevelData[] = [
 #.$ $ #
 # @ $ #
 #.  $ #
-#.    #
+#.  . #
 #######`
   },
   {
@@ -122,10 +122,10 @@ export const LEVELS: LevelData[] = [
     name: "Double Stack",
     data: `  ####
   #  #
-  #  #
+  #. #
 ### $###
 #   $  #
-# .**@ #
+# .*.@ #
 #   #  #
 ########`
   },
@@ -211,7 +211,7 @@ export const LEVELS: LevelData[] = [
 # $ $ #
 # .#. #
 # $.$ #
-## @ ##
+##.@ ##
  #   #
  #####`
   }

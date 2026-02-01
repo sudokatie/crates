@@ -15,33 +15,53 @@ export interface InputCallbacks {
   onConfirm: ActionCallback;
 }
 
+const SWIPE_THRESHOLD = 30; // Minimum distance for swipe detection
+
 export class Input {
   private callbacks: InputCallbacks;
   private enabled: boolean = true;
   private boundHandleKeyDown: (e: KeyboardEvent) => void;
   private boundHandleClick: (e: MouseEvent) => void;
+  private boundHandleTouchStart: (e: TouchEvent) => void;
+  private boundHandleTouchEnd: (e: TouchEvent) => void;
   private canvas: HTMLCanvasElement | null = null;
   private cellSize: number = 40;
+  private scale: number = 1;
+  private offsetX: number = 0;
+  private offsetY: number = 0;
   private playerPos: { x: number; y: number } = { x: 0, y: 0 };
+  private touchStart: { x: number; y: number } | null = null;
 
   constructor(callbacks: InputCallbacks) {
     this.callbacks = callbacks;
     this.boundHandleKeyDown = this.handleKeyDown.bind(this);
     this.boundHandleClick = this.handleClick.bind(this);
+    this.boundHandleTouchStart = this.handleTouchStart.bind(this);
+    this.boundHandleTouchEnd = this.handleTouchEnd.bind(this);
     window.addEventListener('keydown', this.boundHandleKeyDown);
   }
 
   setCanvas(canvas: HTMLCanvasElement, cellSize: number): void {
     if (this.canvas) {
       this.canvas.removeEventListener('click', this.boundHandleClick);
+      this.canvas.removeEventListener('touchstart', this.boundHandleTouchStart);
+      this.canvas.removeEventListener('touchend', this.boundHandleTouchEnd);
     }
     this.canvas = canvas;
     this.cellSize = cellSize;
     this.canvas.addEventListener('click', this.boundHandleClick);
+    this.canvas.addEventListener('touchstart', this.boundHandleTouchStart, { passive: false });
+    this.canvas.addEventListener('touchend', this.boundHandleTouchEnd, { passive: false });
   }
 
   setPlayerPosition(x: number, y: number): void {
     this.playerPos = { x, y };
+  }
+
+  setScaleAndOffset(scale: number, offsetX: number, offsetY: number): void {
+    this.scale = scale;
+    this.offsetX = offsetX;
+    this.offsetY = offsetY;
   }
 
   setEnabled(enabled: boolean): void {
@@ -113,11 +133,16 @@ export class Input {
     if (!this.enabled || !this.canvas) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
+    const displayScale = this.canvas.width / rect.width;
     
-    const clickX = Math.floor((e.clientX - rect.left) * scaleX / this.cellSize);
-    const clickY = Math.floor((e.clientY - rect.top) * scaleY / this.cellSize);
+    // Get click position in canvas coordinates
+    const canvasX = (e.clientX - rect.left) * displayScale;
+    const canvasY = (e.clientY - rect.top) * displayScale;
+    
+    // Account for centering offset and scale
+    const scaledCellSize = this.cellSize * this.scale;
+    const clickX = Math.floor((canvasX - this.offsetX) / scaledCellSize);
+    const clickY = Math.floor((canvasY - this.offsetY) / scaledCellSize);
 
     const dx = clickX - this.playerPos.x;
     const dy = clickY - this.playerPos.y;
@@ -136,10 +161,53 @@ export class Input {
     }
   }
 
+  private handleTouchStart(e: TouchEvent): void {
+    if (!this.enabled || e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    this.touchStart = { x: touch.clientX, y: touch.clientY };
+  }
+
+  private handleTouchEnd(e: TouchEvent): void {
+    if (!this.enabled || !this.touchStart) return;
+    
+    if (e.changedTouches.length !== 1) {
+      this.touchStart = null;
+      return;
+    }
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - this.touchStart.x;
+    const dy = touch.clientY - this.touchStart.y;
+    this.touchStart = null;
+
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    // Need minimum swipe distance
+    if (absDx < SWIPE_THRESHOLD && absDy < SWIPE_THRESHOLD) return;
+
+    e.preventDefault();
+
+    let direction: Direction | null = null;
+
+    if (absDx > absDy) {
+      direction = dx > 0 ? 'right' : 'left';
+    } else {
+      direction = dy > 0 ? 'down' : 'up';
+    }
+
+    if (direction) {
+      this.callbacks.onMove(direction);
+    }
+  }
+
   destroy(): void {
     window.removeEventListener('keydown', this.boundHandleKeyDown);
     if (this.canvas) {
       this.canvas.removeEventListener('click', this.boundHandleClick);
+      this.canvas.removeEventListener('touchstart', this.boundHandleTouchStart);
+      this.canvas.removeEventListener('touchend', this.boundHandleTouchEnd);
     }
   }
 }

@@ -70,6 +70,8 @@ export class Game {
 
     this.renderer.resize(this.level.width, this.level.height);
     this.input.setCanvas(this.canvas, CELL_SIZE);
+    const offset = this.renderer.getOffset();
+    this.input.setScaleAndOffset(this.renderer.getScale(), offset.x, offset.y);
     this.input.setPlayerPosition(this.player.x, this.player.y);
     this.input.setEnabled(true);
 
