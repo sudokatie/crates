@@ -69,7 +69,7 @@ export function GameCanvas() {
       {gameState && (
         <HUD
           levelIndex={gameState.levelIndex}
-          levelName={gameState.level.name}
+          levelName={gameState.levelName}
           moves={gameState.moves}
           pushes={gameState.pushes}
           totalLevels={totalLevels}

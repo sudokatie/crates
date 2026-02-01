@@ -1,6 +1,6 @@
 // Crates - Canvas Renderer
 
-import { CELL_SIZE, COLORS, MOVE_DURATION_MS, MAX_WIDTH, MAX_HEIGHT } from './constants';
+import { CELL_SIZE, COLORS, PUSH_DURATION_MS, MAX_WIDTH, MAX_HEIGHT } from './constants';
 import type { Position, Level, GameStatus } from './types';
 
 interface AnimationState {
@@ -98,7 +98,7 @@ export class Renderer {
     if (!this.animation.active) return;
 
     const elapsed = performance.now() - this.animation.startTime;
-    const progress = Math.min(elapsed / MOVE_DURATION_MS, 1);
+    const progress = Math.min(elapsed / PUSH_DURATION_MS, 1);
 
     if (progress >= 1) {
       this.animation.active = false;
@@ -115,7 +115,7 @@ export class Renderer {
   getAnimationProgress(): number {
     if (!this.animation.active) return 1;
     const elapsed = performance.now() - this.animation.startTime;
-    return Math.min(elapsed / MOVE_DURATION_MS, 1);
+    return Math.min(elapsed / PUSH_DURATION_MS, 1);
   }
 
   isAnimating(): boolean {

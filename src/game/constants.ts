@@ -18,7 +18,7 @@ export const COLORS = {
   textMuted: '#888888',
 };
 
-export const MOVE_DURATION_MS = 80;
+export const PUSH_DURATION_MS = 100;
 
 export const STORAGE_KEY = 'crates_progress';
 

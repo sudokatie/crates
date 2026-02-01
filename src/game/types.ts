@@ -29,13 +29,28 @@ export interface Level {
 export type GameStatus = 'playing' | 'won' | 'menu';
 
 export interface GameState {
+  // Level
   levelIndex: number;
-  level: Level;
+  levelName: string;
+
+  // Grid
+  grid: Cell[][];
+  width: number;
+  height: number;
+
+  // Entities
   player: Position;
   crates: Position[];
+  targets: Position[];
+
+  // Stats
   moves: number;
   pushes: number;
+
+  // History
   undoStack: MoveRecord[];
+
+  // Status
   status: GameStatus;
 }
 

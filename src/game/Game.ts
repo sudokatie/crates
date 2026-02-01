@@ -307,9 +307,13 @@ export class Game {
   getState(): GameState {
     return {
       levelIndex: this.levelIndex,
-      level: this.level,
+      levelName: this.level.name,
+      grid: this.level.grid,
+      width: this.level.width,
+      height: this.level.height,
       player: { ...this.player },
       crates: this.crates.map(c => ({ ...c })),
+      targets: this.level.targets.map(t => ({ ...t })),
       moves: this.moves,
       pushes: this.pushes,
       undoStack: [...this.undoStack],
