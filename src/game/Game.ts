@@ -4,6 +4,7 @@ import { LEVELS, LevelData } from './levels';
 import { CELL_SIZE, STORAGE_KEY, DIRECTIONS } from './constants';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
+import { Sound } from './Sound';
 import type {
   Position,
   Cell,
@@ -186,6 +187,15 @@ export class Game {
           this.undoStack.push(record);
           this.input.setPlayerPosition(this.player.x, this.player.y);
           this.input.setEnabled(true);
+          
+          // Sound effects
+          Sound.play('push');
+          // Check if crate landed on target
+          const isOnTarget = this.level.targets.some(t => t.x === crateTo.x && t.y === crateTo.y);
+          if (isOnTarget) {
+            Sound.play('crateOnTarget');
+          }
+          
           this.render();
           this.checkWin();
           this.emitState();
@@ -215,6 +225,7 @@ export class Game {
           this.undoStack.push(record);
           this.input.setPlayerPosition(this.player.x, this.player.y);
           this.input.setEnabled(true);
+          Sound.play('move');
           this.render();
           this.checkWin();
           this.emitState();
@@ -250,12 +261,14 @@ export class Game {
       }
     }
 
+    Sound.play('undo');
     this.input.setPlayerPosition(this.player.x, this.player.y);
     this.render();
     this.emitState();
   }
 
   restart(): void {
+    Sound.play('restart');
     this.loadLevel(this.levelIndex);
   }
 
@@ -296,6 +309,7 @@ export class Game {
 
     if (allOnTarget) {
       this.status = 'won';
+      Sound.play('levelComplete');
       this.saveProgress();
     }
   }
@@ -377,6 +391,16 @@ export class Game {
 
   getLevelCount(): number {
     return LEVELS.length;
+  }
+
+  toggleSound(): boolean {
+    const newState = !Sound.isEnabled();
+    Sound.setEnabled(newState);
+    return newState;
+  }
+
+  isSoundEnabled(): boolean {
+    return Sound.isEnabled();
   }
 
   destroy(): void {
