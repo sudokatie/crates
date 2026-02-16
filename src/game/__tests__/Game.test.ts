@@ -72,8 +72,8 @@ describe('Game', () => {
   });
 
   describe('level count', () => {
-    it('should have 20 levels', () => {
-      expect(game.getLevelCount()).toBe(20);
+    it('should have 25 levels', () => {
+      expect(game.getLevelCount()).toBe(25);
     });
   });
 
@@ -94,9 +94,9 @@ describe('Game', () => {
     });
 
     it('should not go beyond last level', () => {
-      game.goToLevel(19);
+      game.goToLevel(24);
       game.nextLevel();
-      expect(game.getState().levelIndex).toBe(19);
+      expect(game.getState().levelIndex).toBe(24);
     });
 
     it('should reset moves when changing level', () => {

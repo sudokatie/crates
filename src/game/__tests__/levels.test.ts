@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { LEVELS } from '../levels';
 
 describe('Levels', () => {
-  it('should have 20 levels', () => {
-    expect(LEVELS.length).toBe(20);
+  it('should have 25 levels', () => {
+    expect(LEVELS.length).toBe(25);
   });
 
   it('should have names for all levels', () => {

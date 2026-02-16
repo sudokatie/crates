@@ -6,7 +6,7 @@ Browser-based Sokoban. Push crates onto targets. Regret your life choices.
 
 Sokoban is the purest puzzle game. No enemies, no timer, no randomness. Just you, some crates, and the slowly dawning realization that you've pushed yourself into an unwinnable position. Again.
 
-20 levels of the Microban set. They start easy. They don't stay easy.
+25 levels of increasing difficulty. They start easy. They don't stay easy.
 
 ## Features
 
@@ -15,7 +15,7 @@ Sokoban is the purest puzzle game. No enemies, no timer, no randomness. Just you
 - Smooth movement animations
 - Click-to-move support
 - Level select with progress tracking
-- 20 hand-crafted levels
+- 25 hand-crafted levels
 - Progress saves automatically
 - Best solution tracking (moves and pushes)
 - Per-level leaderboard (track your best runs)
