@@ -18,6 +18,7 @@ Sokoban is the purest puzzle game. No enemies, no timer, no randomness. Just you
 - 20 hand-crafted levels
 - Progress saves automatically
 - Best solution tracking (moves and pushes)
+- Per-level leaderboard (track your best runs)
 - Retro sound effects (synthesized via Web Audio API)
 
 ## Quick Start
