@@ -20,6 +20,7 @@ Sokoban is the purest puzzle game. No enemies, no timer, no randomness. Just you
 - Best solution tracking (moves and pushes)
 - Per-level leaderboard (track your best runs)
 - Retro sound effects (synthesized via Web Audio API)
+- Background music (calm, contemplative chiptune)
 
 ## Quick Start
 
@@ -63,6 +64,14 @@ Open http://localhost:3000 and start pushing.
 - HTML5 Canvas with smooth animations
 - XSB level format parser
 - localStorage for progress
+
+## Music
+
+Background music is a calm, meditative chiptune loop that complements the puzzle-solving mood. Generated entirely with the Web Audio API using soft sine waves.
+
+Control via the `Music` singleton:
+- `Music.play()` / `Music.stop()` / `Music.toggle()`
+- `Music.setVolume(0-1)` / `Music.setEnabled(bool)`
 
 ## Project Structure
 
