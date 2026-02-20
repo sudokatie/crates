@@ -6,6 +6,7 @@ import type { GameState } from '@/game/types';
 import { HUD } from './HUD';
 import { Controls } from './Controls';
 import { LevelSelect } from './LevelSelect';
+import { Music } from '@/game/Music';
 
 export function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +39,23 @@ export function GameCanvas() {
   useEffect(() => {
     if (gameState?.status === 'won' && gameRef.current) {
       setCompletedLevels(gameRef.current.getCompletedLevels());
+    }
+  }, [gameState?.status]);
+
+  // Switch music tracks based on game state
+  useEffect(() => {
+    if (!gameState) return;
+    
+    switch (gameState.status) {
+      case 'menu':
+        Music.play('menu');
+        break;
+      case 'playing':
+        Music.play('gameplay');
+        break;
+      case 'won':
+        Music.play('victory');
+        break;
     }
   }, [gameState?.status]);
 
