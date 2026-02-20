@@ -43,7 +43,7 @@ export class Leaderboard {
       this.data = {};
     }
 
-    return this.data;
+    return this.data ?? {};
   }
 
   /**
