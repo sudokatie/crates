@@ -52,6 +52,15 @@ export interface GameState {
 
   // Status
   status: GameStatus;
+
+  // Daily challenge
+  dailyMode: boolean;
+  dailyProgress?: {
+    current: number;
+    total: number;
+    totalMoves: number;
+    totalPushes: number;
+  };
 }
 
 export interface Progress {

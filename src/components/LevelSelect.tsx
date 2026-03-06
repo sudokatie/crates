@@ -5,10 +5,13 @@ import { LEVELS } from '@/game/levels';
 import { Music } from '@/game/Music';
 import { Sound } from '@/game/Sound';
 
+import { DailyLeaderboard } from '@/game/Daily';
+
 interface LevelSelectProps {
   currentLevel: number;
   completedLevels: number[];
   onSelect: (index: number) => void;
+  onStartDaily: () => void;
   onClose: () => void;
 }
 
@@ -16,8 +19,10 @@ export function LevelSelect({
   currentLevel,
   completedLevels,
   onSelect,
+  onStartDaily,
   onClose,
 }: LevelSelectProps) {
+  const dailyBest = DailyLeaderboard.getBest();
   const [musicVolume, setMusicVolume] = useState(Music.getVolume());
   const [soundVolume, setSoundVolume] = useState(Sound.getVolume());
   const [musicEnabled, setMusicEnabled] = useState(Music.isEnabled());
@@ -59,6 +64,22 @@ export function LevelSelect({
             ×
           </button>
         </div>
+
+        {/* Daily Challenge Button */}
+        <button
+          onClick={() => {
+            onStartDaily();
+            onClose();
+          }}
+          className="w-full mb-4 py-3 px-4 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-lg text-white font-bold transition-all"
+        >
+          <div className="text-lg">DAILY CHALLENGE</div>
+          <div className="text-xs opacity-80">
+            {dailyBest
+              ? `Best: ${dailyBest.totalMoves} moves (${dailyBest.levelsCompleted} levels)`
+              : '3 random levels - compete for best moves!'}
+          </div>
+        </button>
 
         <div className="grid grid-cols-4 gap-2">
           {LEVELS.map((level, index) => {

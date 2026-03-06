@@ -5,6 +5,7 @@ import { CELL_SIZE, STORAGE_KEY, DIRECTIONS } from './constants';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { Sound } from './Sound';
+import { getDailyLevelIds, DailyLeaderboard, todayString, generateShareCode } from './Daily';
 import type {
   Position,
   Cell,
@@ -32,8 +33,25 @@ export class Game {
   private completedLevels: number[] = [];
   private bestSolutions: { [key: number]: { moves: number; pushes: number } } = {};
 
+  // Daily challenge state
+  private dailyMode: boolean = false;
+  private dailyLevels: number[] = [];
+  private dailyLevelIndex: number = 0;
+  private dailyTotalMoves: number = 0;
+  private dailyTotalPushes: number = 0;
+  private dailyStartTime: number = 0;
+  private dailyComplete: boolean = false;
+
   onStateChange?: (state: GameState) => void;
   onMenuRequest?: () => void;
+  onDailyComplete?: (result: {
+    rank: number | null;
+    totalMoves: number;
+    totalPushes: number;
+    levelsCompleted: number;
+    timeSeconds: number;
+    shareCode: string;
+  }) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -273,10 +291,86 @@ export class Game {
   }
 
   nextLevel(): void {
-    if (this.levelIndex < LEVELS.length - 1) {
+    if (this.dailyMode) {
+      // In daily mode, advance to next daily level
+      this.dailyTotalMoves += this.moves;
+      this.dailyTotalPushes += this.pushes;
+      this.dailyLevelIndex++;
+      
+      if (this.dailyLevelIndex < this.dailyLevels.length) {
+        this.loadLevel(this.dailyLevels[this.dailyLevelIndex]);
+      } else {
+        // Daily complete
+        this.dailyComplete = true;
+        const timeSeconds = Math.floor((Date.now() - this.dailyStartTime) / 1000);
+        const shareCode = generateShareCode(todayString(), this.dailyTotalMoves, this.dailyLevels.length);
+        
+        // Record to leaderboard (prompt for name in UI)
+        this.onDailyComplete?.({
+          rank: null,
+          totalMoves: this.dailyTotalMoves,
+          totalPushes: this.dailyTotalPushes,
+          levelsCompleted: this.dailyLevels.length,
+          timeSeconds,
+          shareCode,
+        });
+      }
+    } else if (this.levelIndex < LEVELS.length - 1) {
       this.loadLevel(this.levelIndex + 1);
       this.saveProgress();
     }
+  }
+
+  /** Start a daily challenge */
+  startDaily(): void {
+    this.dailyMode = true;
+    this.dailyLevels = getDailyLevelIds(LEVELS.length);
+    this.dailyLevelIndex = 0;
+    this.dailyTotalMoves = 0;
+    this.dailyTotalPushes = 0;
+    this.dailyStartTime = Date.now();
+    this.dailyComplete = false;
+    
+    this.loadLevel(this.dailyLevels[0]);
+  }
+
+  /** Exit daily mode */
+  exitDaily(): void {
+    this.dailyMode = false;
+    this.dailyLevels = [];
+    this.dailyLevelIndex = 0;
+    this.dailyTotalMoves = 0;
+    this.dailyTotalPushes = 0;
+    this.dailyComplete = false;
+    
+    this.loadLevel(this.levelIndex);
+  }
+
+  /** Submit daily score with name */
+  submitDailyScore(name: string): number | null {
+    const timeSeconds = Math.floor((Date.now() - this.dailyStartTime) / 1000);
+    return DailyLeaderboard.recordScore(
+      name,
+      this.dailyTotalMoves,
+      this.dailyTotalPushes,
+      this.dailyLevels.length,
+      timeSeconds
+    );
+  }
+
+  /** Check if in daily mode */
+  isDailyMode(): boolean {
+    return this.dailyMode;
+  }
+
+  /** Get daily progress */
+  getDailyProgress(): { current: number; total: number; moves: number; pushes: number } {
+    return {
+      current: this.dailyLevelIndex + 1,
+      total: this.dailyLevels.length,
+      moves: this.dailyTotalMoves + this.moves,
+      pushes: this.dailyTotalPushes + this.pushes,
+    };
   }
 
   prevLevel(): void {
@@ -319,7 +413,7 @@ export class Game {
   }
 
   getState(): GameState {
-    return {
+    const state: GameState = {
       levelIndex: this.levelIndex,
       levelName: this.level.name,
       grid: this.level.grid,
@@ -332,7 +426,19 @@ export class Game {
       pushes: this.pushes,
       undoStack: [...this.undoStack],
       status: this.status,
+      dailyMode: this.dailyMode,
     };
+
+    if (this.dailyMode) {
+      state.dailyProgress = {
+        current: this.dailyLevelIndex + 1,
+        total: this.dailyLevels.length,
+        totalMoves: this.dailyTotalMoves + this.moves,
+        totalPushes: this.dailyTotalPushes + this.pushes,
+      };
+    }
+
+    return state;
   }
 
   getCompletedLevels(): number[] {

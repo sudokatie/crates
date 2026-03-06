@@ -6,6 +6,7 @@ import type { GameState } from '@/game/types';
 import { HUD } from './HUD';
 import { Controls } from './Controls';
 import { LevelSelect } from './LevelSelect';
+import { DailyComplete } from './DailyComplete';
 import { Music } from '@/game/Music';
 
 export function GameCanvas() {
@@ -14,6 +15,12 @@ export function GameCanvas() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
   const [completedLevels, setCompletedLevels] = useState<number[]>([]);
+  const [dailyResult, setDailyResult] = useState<{
+    totalMoves: number;
+    totalPushes: number;
+    levelsCompleted: number;
+    timeSeconds: number;
+  } | null>(null);
 
   const handleStateChange = useCallback((state: GameState) => {
     setGameState(state);
@@ -26,6 +33,14 @@ export function GameCanvas() {
     const game = new Game(canvas);
     game.onStateChange = handleStateChange;
     game.onMenuRequest = () => setShowLevelSelect(true);
+    game.onDailyComplete = (result) => {
+      setDailyResult({
+        totalMoves: result.totalMoves,
+        totalPushes: result.totalPushes,
+        levelsCompleted: result.levelsCompleted,
+        timeSeconds: result.timeSeconds,
+      });
+    };
     gameRef.current = game;
     setGameState(game.getState());
     setCompletedLevels(game.getCompletedLevels());
@@ -78,6 +93,14 @@ export function GameCanvas() {
     gameRef.current?.goToLevel(index);
     setShowLevelSelect(false);
   };
+  const handleStartDaily = () => {
+    gameRef.current?.startDaily();
+    setShowLevelSelect(false);
+  };
+  const handleDailyClose = () => {
+    setDailyResult(null);
+    gameRef.current?.exitDaily();
+  };
 
   const totalLevels = gameRef.current?.getLevelCount() ?? 20;
 
@@ -91,6 +114,8 @@ export function GameCanvas() {
           moves={gameState.moves}
           pushes={gameState.pushes}
           totalLevels={totalLevels}
+          dailyMode={gameState.dailyMode}
+          dailyProgress={gameState.dailyProgress}
         />
       )}
 
@@ -103,11 +128,16 @@ export function GameCanvas() {
         />
 
         {/* Win Overlay */}
-        {gameState?.status === 'won' && (
+        {gameState?.status === 'won' && !dailyResult && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 rounded">
             <h2 className="text-3xl font-bold text-green-400 mb-2">SOLVED!</h2>
             <p className="text-white mb-1">Moves: {gameState.moves}</p>
             <p className="text-white mb-4">Pushes: {gameState.pushes}</p>
+            {gameState.dailyMode && gameState.dailyProgress && (
+              <p className="text-amber-400 mb-2">
+                Daily: {gameState.dailyProgress.current}/{gameState.dailyProgress.total}
+              </p>
+            )}
             <p className="text-gray-300 animate-pulse">Press SPACE for next level</p>
           </div>
         )}
@@ -139,7 +169,20 @@ export function GameCanvas() {
           currentLevel={gameState.levelIndex}
           completedLevels={completedLevels}
           onSelect={handleLevelSelect}
+          onStartDaily={handleStartDaily}
           onClose={() => setShowLevelSelect(false)}
+        />
+      )}
+
+      {/* Daily Complete Modal */}
+      {dailyResult && (
+        <DailyComplete
+          totalMoves={dailyResult.totalMoves}
+          totalPushes={dailyResult.totalPushes}
+          levelsCompleted={dailyResult.levelsCompleted}
+          timeSeconds={dailyResult.timeSeconds}
+          onSubmit={() => {}}
+          onClose={handleDailyClose}
         />
       )}
     </div>
