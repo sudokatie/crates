@@ -6,6 +6,7 @@ import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { Sound } from './Sound';
 import { getDailyLevelIds, DailyLeaderboard, todayString, generateShareCode } from './Daily';
+import { Replay, ReplayData } from './Replay';
 import type {
   Position,
   Cell,
@@ -42,8 +43,16 @@ export class Game {
   private dailyStartTime: number = 0;
   private dailyComplete: boolean = false;
 
+  // Replay state
+  private replay: Replay = new Replay();
+  private replayMode: boolean = false;
+  private replayData: ReplayData | null = null;
+  private replayAnimationId: number | null = null;
+  private levelsCompletedInSession: number = 0;
+
   onStateChange?: (state: GameState) => void;
   onMenuRequest?: () => void;
+  onGameOver?: (replayData: ReplayData) => void;
   onDailyComplete?: (result: {
     rank: number | null;
     totalMoves: number;
@@ -92,7 +101,13 @@ export class Game {
     const offset = this.renderer.getOffset();
     this.input.setScaleAndOffset(this.renderer.getScale(), offset.x, offset.y);
     this.input.setPlayerPosition(this.player.x, this.player.y);
-    this.input.setEnabled(true);
+    this.input.setEnabled(!this.replayMode);
+
+    // Start recording if not in replay mode and not already recording
+    if (!this.replayMode && !this.replay.isRecording) {
+      this.replay.startRecording(index, this.dailyMode);
+      this.levelsCompletedInSession = 0;
+    }
 
     this.render();
     this.emitState();
@@ -160,6 +175,12 @@ export class Game {
 
   private move(direction: Direction): void {
     if (this.status !== 'playing' || this.renderer.isAnimating()) return;
+    if (this.replayMode) return; // Ignore input during replay playback
+
+    // Record move for replay
+    if (this.replay.isRecording) {
+      this.replay.recordMove(direction);
+    }
 
     const { dx, dy } = DIRECTIONS[direction];
     const targetX = this.player.x + dx;
@@ -403,8 +424,17 @@ export class Game {
 
     if (allOnTarget) {
       this.status = 'won';
+      this.levelsCompletedInSession++;
       Sound.play('levelComplete');
       this.saveProgress();
+      
+      // Stop recording and emit game over with replay data (non-daily mode)
+      if (!this.dailyMode && !this.replayMode && this.replay.isRecording) {
+        const totalMoves = this.moves;
+        const totalPushes = this.pushes;
+        const data = this.replay.stopRecording(totalMoves, totalPushes, this.levelsCompletedInSession);
+        this.onGameOver?.(data);
+      }
     }
   }
 
@@ -509,7 +539,168 @@ export class Game {
     return Sound.isEnabled();
   }
 
+  // Replay playback methods
+
+  /** Start playing a replay */
+  startReplay(data: ReplayData): void {
+    this.replayMode = true;
+    this.replayData = data;
+    this.levelsCompletedInSession = 0;
+    
+    // Load starting level
+    this.loadLevel(data.levelIndex);
+    
+    // Disable input during replay
+    this.input.setEnabled(false);
+    
+    // Start playback
+    this.replay.startPlayback(data);
+    this.runReplayLoop();
+  }
+
+  /** Stop replay playback */
+  stopReplay(): void {
+    if (this.replayAnimationId !== null) {
+      cancelAnimationFrame(this.replayAnimationId);
+      this.replayAnimationId = null;
+    }
+    this.replay.stopPlayback();
+    this.replayMode = false;
+    this.replayData = null;
+    this.input.setEnabled(true);
+  }
+
+  /** Check if in replay mode */
+  isReplayMode(): boolean {
+    return this.replayMode;
+  }
+
+  /** Get replay playback progress (0-1) */
+  getReplayProgress(): number {
+    return this.replay.playbackProgress;
+  }
+
+  /** Run the replay playback loop */
+  private runReplayLoop(): void {
+    const tick = () => {
+      if (!this.replayMode) return;
+      
+      // Check for next action
+      const direction = this.replay.getNextAction();
+      if (direction) {
+        this.executeMove(direction);
+      }
+      
+      // Check if playback complete
+      if (this.replay.isPlaybackComplete) {
+        // Give a moment for final animation
+        setTimeout(() => {
+          if (this.replayMode) {
+            this.stopReplay();
+            this.emitState();
+          }
+        }, 500);
+        return;
+      }
+      
+      this.replayAnimationId = requestAnimationFrame(tick);
+    };
+    
+    this.replayAnimationId = requestAnimationFrame(tick);
+  }
+
+  /** Execute a move direction (used by replay playback) */
+  private executeMove(direction: Direction): void {
+    if (this.status !== 'playing' || this.renderer.isAnimating()) return;
+
+    const { dx, dy } = DIRECTIONS[direction];
+    const targetX = this.player.x + dx;
+    const targetY = this.player.y + dy;
+
+    if (this.isWall(targetX, targetY)) return;
+
+    const crateIndex = this.getCrateAt(targetX, targetY);
+    const playerFrom = { ...this.player };
+
+    if (crateIndex !== -1) {
+      const beyondX = targetX + dx;
+      const beyondY = targetY + dy;
+
+      if (this.isWall(beyondX, beyondY) || this.getCrateAt(beyondX, beyondY) !== -1) {
+        return;
+      }
+
+      const crateFrom = { x: targetX, y: targetY };
+      const crateTo = { x: beyondX, y: beyondY };
+
+      const record: MoveRecord = {
+        playerFrom,
+        playerTo: { x: targetX, y: targetY },
+        crateMoved: crateFrom,
+        crateTo,
+      };
+
+      this.renderer.startMoveAnimation(
+        playerFrom,
+        record.playerTo,
+        crateFrom,
+        crateTo,
+        crateIndex,
+        () => {
+          this.crates[crateIndex] = { ...crateTo };
+          this.player = { ...record.playerTo };
+          this.moves++;
+          this.pushes++;
+          this.undoStack.push(record);
+          this.input.setPlayerPosition(this.player.x, this.player.y);
+          
+          Sound.play('push');
+          const isOnTarget = this.level.targets.some(t => t.x === crateTo.x && t.y === crateTo.y);
+          if (isOnTarget) {
+            Sound.play('crateOnTarget');
+          }
+          
+          this.render();
+          this.checkWin();
+          this.emitState();
+        }
+      );
+
+      this.animateMove();
+    } else {
+      const record: MoveRecord = {
+        playerFrom,
+        playerTo: { x: targetX, y: targetY },
+        crateMoved: null,
+        crateTo: null,
+      };
+
+      this.renderer.startMoveAnimation(
+        playerFrom,
+        record.playerTo,
+        null,
+        null,
+        -1,
+        () => {
+          this.player = { ...record.playerTo };
+          this.moves++;
+          this.undoStack.push(record);
+          this.input.setPlayerPosition(this.player.x, this.player.y);
+          Sound.play('move');
+          this.render();
+          this.checkWin();
+          this.emitState();
+        }
+      );
+
+      this.animateMove();
+    }
+  }
+
   destroy(): void {
+    if (this.replayAnimationId !== null) {
+      cancelAnimationFrame(this.replayAnimationId);
+    }
     this.input.destroy();
   }
 }
