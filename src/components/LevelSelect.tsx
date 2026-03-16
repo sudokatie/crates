@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LEVELS } from '@/game/levels';
 import { Music } from '@/game/Music';
 import { Sound } from '@/game/Sound';
-
 import { DailyLeaderboard } from '@/game/Daily';
 
 interface LevelSelectProps {
@@ -28,17 +27,13 @@ export function LevelSelect({
   const [musicEnabled, setMusicEnabled] = useState(Music.isEnabled());
   const [soundEnabled, setSoundEnabled] = useState(Sound.isEnabled());
 
-  const handleMusicVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vol = parseFloat(e.target.value);
-    setMusicVolume(vol);
-    Music.setVolume(vol);
-  };
+  useEffect(() => {
+    Music.setVolume(musicVolume);
+  }, [musicVolume]);
 
-  const handleSoundVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vol = parseFloat(e.target.value);
-    setSoundVolume(vol);
-    Sound.setVolume(vol);
-  };
+  useEffect(() => {
+    Sound.setVolume(soundVolume);
+  }, [soundVolume]);
 
   const toggleMusic = () => {
     const newState = !musicEnabled;
@@ -53,126 +48,149 @@ export function LevelSelect({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-white">Select Level</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
-          >
-            ×
-          </button>
+    <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center z-50 p-4">
+      {/* Header */}
+      <div className="w-full max-w-lg mb-4">
+        <div className="flex items-center justify-between">
+          <a href="/games/" className="mc-link">&lt; BACK TO HUB</a>
+          <button onClick={onClose} className="mc-link">CLOSE X</button>
+        </div>
+      </div>
+
+      {/* Main Panel */}
+      <div className="mc-panel p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
+        {/* Title Bar */}
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[#2a2a2a]">
+          <div className="mc-dot" />
+          <h1 className="mc-header-primary text-xl tracking-wider">CRATES - MISSION SELECT</h1>
         </div>
 
-        {/* Daily Challenge Button */}
-        <button
-          onClick={() => {
-            onStartDaily();
-            onClose();
-          }}
-          className="w-full mb-4 py-3 px-4 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-lg text-white font-bold transition-all"
-        >
-          <div className="text-lg">DAILY CHALLENGE</div>
-          <div className="text-xs opacity-80">
-            {dailyBest
-              ? `Best: ${dailyBest.totalMoves} moves (${dailyBest.levelsCompleted} levels)`
-              : '3 random levels - compete for best moves!'}
+        {/* Daily Challenge */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 bg-[#dc2626]" />
+            <span className="mc-header">DAILY CHALLENGE</span>
           </div>
-        </button>
-
-        <div className="grid grid-cols-4 gap-2">
-          {LEVELS.map((level, index) => {
-            const isCompleted = completedLevels.includes(index);
-            const isCurrent = index === currentLevel;
-
-            return (
-              <button
-                key={index}
-                onClick={() => {
-                  onSelect(index);
-                  onClose();
-                }}
-                className={`
-                  p-3 rounded text-center transition-colors
-                  ${isCurrent
-                    ? 'bg-blue-600 text-white'
-                    : isCompleted
-                      ? 'bg-green-700 text-white hover:bg-green-600'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }
-                `}
-              >
-                <div className="font-bold">{index + 1}</div>
-                <div className="text-xs truncate">{level.name}</div>
-                {isCompleted && <div className="text-xs mt-1">✓</div>}
-              </button>
-            );
-          })}
+          <div className="bg-[#0d0d0d] border border-[#2a2a2a] p-4">
+            {dailyBest ? (
+              <div className="text-center mb-3">
+                <span className="mc-header block mb-1">BEST SCORE</span>
+                <span className="text-[#dc2626] font-mono text-xl">{dailyBest.totalMoves} MOVES</span>
+                <span className="text-[#555555] text-xs block mt-1 font-mono">
+                  {dailyBest.levelsCompleted} LEVELS
+                </span>
+              </div>
+            ) : (
+              <div className="text-center mb-3">
+                <span className="text-[#555555] text-xs tracking-wider">
+                  3 RANDOM LEVELS - COMPETE FOR BEST MOVES
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                onStartDaily();
+                onClose();
+              }}
+              className="w-full py-3 bg-[#dc2626] hover:bg-[#b91c1c] text-white text-sm tracking-widest font-medium transition-colors border border-[#dc2626]"
+            >
+              INITIATE DAILY
+            </button>
+          </div>
         </div>
 
-        {/* Volume Controls */}
-        <div className="mt-6 pt-4 border-t border-gray-700">
-          <h3 className="text-sm font-medium text-gray-300 mb-3">Audio Settings</h3>
+        {/* Level Grid */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 bg-[#dc2626]" />
+            <span className="mc-header">SELECT MISSION</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {LEVELS.map((level, index) => {
+              const isCompleted = completedLevels.includes(index);
+              const isCurrent = index === currentLevel;
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => {
+                    onSelect(index);
+                    onClose();
+                  }}
+                  className={`p-3 text-center transition border ${
+                    isCurrent
+                      ? 'bg-[#dc2626] border-[#dc2626] text-white'
+                      : isCompleted
+                        ? 'bg-[#0d0d0d] border-white text-white hover:border-[#dc2626]'
+                        : 'bg-[#0d0d0d] border-[#2a2a2a] text-[#888888] hover:border-[#dc2626] hover:text-white'
+                  }`}
+                >
+                  <div className="font-mono text-lg">{index + 1}</div>
+                  <div className="text-[10px] truncate tracking-wider uppercase">{level.name}</div>
+                  {isCompleted && <div className="text-[10px] mt-1 text-[#dc2626]">*</div>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Audio Settings */}
+        <div className="border-t border-[#2a2a2a] pt-4">
+          <span className="mc-header block mb-3">AUDIO SYSTEMS</span>
           
-          {/* Music Volume */}
-          <div className="mb-3">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-sm text-gray-400">Music</label>
-              <button
-                onClick={toggleMusic}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                  musicEnabled
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                    : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-                }`}
-              >
-                {musicEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
+          <div className="flex items-center gap-3 mb-3">
+            <button
+              onClick={toggleMusic}
+              className={`w-8 h-8 flex items-center justify-center text-xs font-mono border transition-colors ${
+                musicEnabled 
+                  ? 'bg-[#dc2626] border-[#dc2626] text-white' 
+                  : 'bg-transparent border-[#2a2a2a] text-[#555555]'
+              }`}
+            >
+              {musicEnabled ? 'ON' : 'OFF'}
+            </button>
+            <span className="text-[#888888] text-xs tracking-wider w-14">MUSIC</span>
             <input
               type="range"
               min="0"
-              max="1"
-              step="0.01"
-              value={musicVolume}
-              onChange={handleMusicVolumeChange}
+              max="100"
+              value={musicVolume * 100}
+              onChange={(e) => setMusicVolume(Number(e.target.value) / 100)}
               disabled={!musicEnabled}
-              className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 disabled:opacity-50"
+              className="flex-1 h-1 bg-[#2a2a2a] appearance-none cursor-pointer disabled:opacity-50 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-[#dc2626]"
             />
           </div>
-
-          {/* Sound Volume */}
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-sm text-gray-400">Sound Effects</label>
-              <button
-                onClick={toggleSound}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                  soundEnabled
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                    : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-                }`}
-              >
-                {soundEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleSound}
+              className={`w-8 h-8 flex items-center justify-center text-xs font-mono border transition-colors ${
+                soundEnabled 
+                  ? 'bg-[#dc2626] border-[#dc2626] text-white' 
+                  : 'bg-transparent border-[#2a2a2a] text-[#555555]'
+              }`}
+            >
+              {soundEnabled ? 'ON' : 'OFF'}
+            </button>
+            <span className="text-[#888888] text-xs tracking-wider w-14">SFX</span>
             <input
               type="range"
               min="0"
-              max="1"
-              step="0.01"
-              value={soundVolume}
-              onChange={handleSoundVolumeChange}
+              max="100"
+              value={soundVolume * 100}
+              onChange={(e) => setSoundVolume(Number(e.target.value) / 100)}
               disabled={!soundEnabled}
-              className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 disabled:opacity-50"
+              className="flex-1 h-1 bg-[#2a2a2a] appearance-none cursor-pointer disabled:opacity-50 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-[#dc2626]"
             />
           </div>
         </div>
+      </div>
 
-        <div className="mt-4 text-center text-sm text-gray-400">
-          <p>Click a level to play</p>
-          <p>Press Escape to close</p>
+      {/* Footer */}
+      <div className="w-full max-w-lg mt-4">
+        <div className="flex items-center justify-center gap-2">
+          <span className="mc-header text-[10px]">CONTROLS:</span>
+          <span className="text-[#555555] text-xs font-mono">Arrow keys move | R reset | ESC close</span>
         </div>
       </div>
     </div>
