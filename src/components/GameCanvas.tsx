@@ -158,81 +158,96 @@ export function GameCanvas() {
   const totalLevels = gameRef.current?.getLevelCount() ?? 20;
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      {/* HUD */}
-      {gameState && (
-        <HUD
-          levelIndex={gameState.levelIndex}
-          levelName={gameState.levelName}
-          moves={gameState.moves}
-          pushes={gameState.pushes}
-          totalLevels={totalLevels}
-          dailyMode={gameState.dailyMode}
-          dailyProgress={gameState.dailyProgress}
-        />
-      )}
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      {/* Header */}
+      <div className="w-full max-w-xl mb-4">
+        <div className="flex items-center justify-between">
+          <a href="/games/" className="mc-link">&lt; BACK TO HUB</a>
+          <span className="mc-header">MISSION ACTIVE</span>
+        </div>
+      </div>
 
-      {/* Canvas Container */}
-      <div className="relative flex items-center justify-center">
-        <canvas
-          ref={canvasRef}
-          className="border-4 border-gray-700 rounded"
-          style={{ imageRendering: 'pixelated' }}
-        />
-
-        {/* Win Overlay - only show in daily mode since normal mode shows ReplayView */}
-        {gameState?.status === 'won' && !dailyResult && gameState.dailyMode && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 rounded">
-            <h2 className="text-3xl font-bold text-green-400 mb-2">SOLVED!</h2>
-            <p className="text-white mb-1">Moves: {gameState.moves}</p>
-            <p className="text-white mb-4">Pushes: {gameState.pushes}</p>
-            {gameState.dailyProgress && (
-              <p className="text-amber-400 mb-2">
-                Daily: {gameState.dailyProgress.current}/{gameState.dailyProgress.total}
-              </p>
-            )}
-            <p className="text-gray-300 animate-pulse">Press SPACE for next level</p>
+      {/* Game Panel */}
+      <div className="mc-panel p-6">
+        {/* HUD */}
+        {gameState && (
+          <div className="mb-4 pb-4 border-b border-[#2a2a2a]">
+            <HUD
+              levelIndex={gameState.levelIndex}
+              levelName={gameState.levelName}
+              moves={gameState.moves}
+              pushes={gameState.pushes}
+              totalLevels={totalLevels}
+              dailyMode={gameState.dailyMode}
+              dailyProgress={gameState.dailyProgress}
+            />
           </div>
         )}
 
-        {/* Replay playback overlay */}
-        {isReplaying && (
-          <div className="absolute top-0 left-0 right-0 p-2 bg-black/70 flex items-center gap-2">
-            <span className="text-blue-400 text-sm font-bold">REPLAY</span>
-            <div className="flex-1 h-2 bg-gray-700 rounded overflow-hidden">
-              <div
-                className="h-full bg-blue-500 transition-all duration-100"
-                style={{ width: `${replayProgress * 100}%` }}
-              />
+        {/* Canvas Container */}
+        <div className="relative flex items-center justify-center mb-4">
+          <canvas
+            ref={canvasRef}
+            className="border border-[#2a2a2a]"
+            style={{ imageRendering: 'pixelated' }}
+          />
+
+          {/* Win Overlay - only show in daily mode since normal mode shows ReplayView */}
+          {gameState?.status === 'won' && !dailyResult && gameState.dailyMode && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+              <h2 className="mc-header-primary text-2xl mb-4">SOLVED</h2>
+              <div className="text-[#888888] text-xs tracking-wider mb-1">MOVES: <span className="text-white font-mono">{gameState.moves}</span></div>
+              <div className="text-[#888888] text-xs tracking-wider mb-4">PUSHES: <span className="text-white font-mono">{gameState.pushes}</span></div>
+              {gameState.dailyProgress && (
+                <div className="text-[#dc2626] text-xs tracking-wider mb-4">
+                  DAILY {gameState.dailyProgress.current}/{gameState.dailyProgress.total}
+                </div>
+              )}
+              <p className="text-[#555555] text-xs tracking-wider animate-pulse">PRESS SPACE FOR NEXT LEVEL</p>
             </div>
-            <button
-              onClick={handleStopReplay}
-              className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
-            >
-              Stop
-            </button>
-          </div>
+          )}
+
+          {/* Replay playback overlay */}
+          {isReplaying && (
+            <div className="absolute top-0 left-0 right-0 p-2 bg-black/80 flex items-center gap-2 border-b border-[#2a2a2a]">
+              <span className="text-[#dc2626] text-xs tracking-wider">REPLAY</span>
+              <div className="flex-1 h-1 bg-[#1a1a1a] overflow-hidden">
+                <div
+                  className="h-full bg-[#dc2626] transition-all duration-100"
+                  style={{ width: `${replayProgress * 100}%` }}
+                />
+              </div>
+              <button
+                onClick={handleStopReplay}
+                className="px-2 py-1 bg-[#dc2626] hover:bg-[#b91c1c] text-white text-xs tracking-wider"
+              >
+                STOP
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Controls */}
+        {gameState && (
+          <Controls
+            onUndo={handleUndo}
+            onRestart={handleRestart}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onLevelSelect={() => setShowLevelSelect(true)}
+            canUndo={gameState.undoStack.length > 0}
+            canPrev={gameState.levelIndex > 0}
+            canNext={gameState.levelIndex < totalLevels - 1}
+          />
         )}
       </div>
 
-      {/* Controls */}
-      {gameState && (
-        <Controls
-          onUndo={handleUndo}
-          onRestart={handleRestart}
-          onPrev={handlePrev}
-          onNext={handleNext}
-          onLevelSelect={() => setShowLevelSelect(true)}
-          canUndo={gameState.undoStack.length > 0}
-          canPrev={gameState.levelIndex > 0}
-          canNext={gameState.levelIndex < totalLevels - 1}
-        />
-      )}
-
-      {/* Instructions */}
-      <div className="text-sm text-gray-400 text-center max-w-md">
-        <p>Arrow keys or WASD to move | Click adjacent cell</p>
-        <p>U / Ctrl+Z to undo | R to restart | Escape for levels</p>
+      {/* Footer */}
+      <div className="w-full max-w-xl mt-4">
+        <div className="flex flex-col items-center gap-1">
+          <span className="mc-header text-[10px]">CONTROLS</span>
+          <span className="text-[#555555] text-xs font-mono">Arrow keys/WASD move | U undo | R restart | ESC levels</span>
+        </div>
       </div>
 
       {/* Level Select Modal */}
@@ -279,9 +294,9 @@ export function GameCanvas() {
       {!isReplaying && !showLevelSelect && !dailyResult && !showReplayView && (
         <button
           onClick={() => setShowReplayImport(true)}
-          className="mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
+          className="mt-4 px-4 py-2 bg-transparent border border-[#2a2a2a] text-[#888888] text-xs tracking-widest transition-colors hover:text-white hover:border-[#3a3a3a]"
         >
-          Import Replay
+          IMPORT REPLAY
         </button>
       )}
     </div>

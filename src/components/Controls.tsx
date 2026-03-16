@@ -21,47 +21,50 @@ export function Controls({
   canPrev,
   canNext,
 }: ControlsProps) {
-  const buttonClass = "px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
+  const buttonBase = "px-4 py-2 text-xs tracking-widest font-medium transition-colors border";
+  const buttonEnabled = "bg-transparent border-[#2a2a2a] text-white hover:border-[#dc2626]";
+  const buttonDisabled = "bg-transparent border-[#1a1a1a] text-[#333333] cursor-not-allowed";
+  const buttonPrimary = "bg-[#dc2626] border-[#dc2626] text-white hover:bg-[#b91c1c]";
 
   return (
     <div className="flex flex-wrap justify-center gap-2">
       <button
         onClick={onUndo}
         disabled={!canUndo}
-        className={buttonClass}
+        className={`${buttonBase} ${canUndo ? buttonEnabled : buttonDisabled}`}
         title="Undo (U or Ctrl+Z)"
       >
-        ↶ Undo
+        UNDO
       </button>
       <button
         onClick={onRestart}
-        className={buttonClass}
+        className={`${buttonBase} ${buttonEnabled}`}
         title="Restart level (R)"
       >
-        ↺ Restart
+        RESTART
       </button>
       <button
         onClick={onPrev}
         disabled={!canPrev}
-        className={buttonClass}
+        className={`${buttonBase} ${canPrev ? buttonEnabled : buttonDisabled}`}
         title="Previous level (P)"
       >
-        ← Prev
+        PREV
       </button>
       <button
         onClick={onNext}
         disabled={!canNext}
-        className={buttonClass}
+        className={`${buttonBase} ${canNext ? buttonPrimary : buttonDisabled}`}
         title="Next level (N)"
       >
-        Next →
+        NEXT
       </button>
       <button
         onClick={onLevelSelect}
-        className={buttonClass}
+        className={`${buttonBase} ${buttonEnabled}`}
         title="Level select (Escape)"
       >
-        Levels
+        LEVELS
       </button>
     </div>
   );
